@@ -10,8 +10,12 @@ function Send-OscMessage {
     # Helper functions
     function Convert-To-OscBytes {
         param ([string]$String)
+        # For empty strings, we still need to send a null terminator
+        if ($String -eq "") {
+            return [byte[]]@(0, 0, 0, 0)  # Return 4 null bytes for empty string
+        }
         # Convert string to bytes
-        $bytes = [System.Text.Encoding]::ASCII.GetBytes($String)
+        $bytes = [System.Text.Encoding]::ASCII.GetBytes($String + [char]0)  # Add null terminator
         # Pad bytes to 4-byte alignment
         $padding = 4 - ($bytes.Length % 4) # Calculate how many bytes to pad
         if ($padding -eq 4) { $padding = 0 } # If padding is 4, set it to 0
@@ -56,9 +60,10 @@ function Send-OscMessage {
 
         # Get type tag bytes with proper padding
         $typeTagBytes = [System.Text.Encoding]::ASCII.GetBytes($typeTag)
-        $paddedLength = if ($Arguments.Count -ge 3) { 8 } else { 4 }
-        $paddedTypeTag = New-Object byte[] $paddedLength
-        [Array]::Copy($typeTagBytes, $paddedTypeTag, $typeTagBytes.Length)
+        $padding = 4 - ($typeTagBytes.Length % 4) # Calculate padding to align to 4 bytes
+        if ($padding -eq 4) { $padding = 0 } # If padding is 4, set it to 0
+        $paddedTypeTag = New-Object byte[] ($typeTagBytes.Length + $padding) # Create a new byte array with the padded length
+        [Array]::Copy($typeTagBytes, $paddedTypeTag, $typeTagBytes.Length) # Copy the type tag bytes to the new array
         $messageBytes += $paddedTypeTag
 
         if ($Debug) {
